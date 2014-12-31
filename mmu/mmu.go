@@ -35,8 +35,8 @@ var (
 	romoffs, ramoffs int
 
 	inbios bool
-	ie     byte
-	iflags byte
+	Ie     byte
+	If byte
 
 	mbcs [2]mbc
 
@@ -99,7 +99,7 @@ func ReadByte(addr int) byte {
 		// Zeropage RAM, IO, interrupts
 		case 0xF00:
 			if addr == 0xFFFF {
-				return ie
+				return Ie
 			} else if addr > 0xFF7F {
 				return zram[addr&0x7F]
 			} else {
@@ -115,7 +115,7 @@ func ReadByte(addr int) byte {
 						//return timer.ReadByte(addr)
 						return 0
 					case 15:
-						return iflags
+						return If
 					default:
 						return 0
 					}
@@ -135,8 +135,8 @@ func ReadByte(addr int) byte {
 	return 0
 }
 
-func ReadWord(addr int) byte {
-	return ReadByte(addr) + (ReadByte(addr+1) << 8)
+func ReadWord(addr int) int {
+	return int(ReadByte(addr)) + int((ReadByte(addr+1) << 8))
 }
 
 func WriteByte(addr int, value byte) {
@@ -215,7 +215,7 @@ func WriteByte(addr int, value byte) {
 		// Zeropage RAM, IO, interrupts
 		case 0xF00:
 			if addr == 0xFFFF {
-				ie = value
+				Ie = value
 			} else if addr > 0xFF7F {
 				zram[addr&0x7F] = value
 			} else {
@@ -229,7 +229,7 @@ func WriteByte(addr int, value byte) {
 						// TODO
 						//return timer.WriteByte(addr, value)
 					case 15:
-						iflags = value
+						If = value
 					}
 
 				case 0x10, 0x20, 0x30:
@@ -262,8 +262,8 @@ func Reset() {
 	}
 
 	inbios = true
-	ie = 0
-	iflags = 0
+	Ie = 0
+	If = 0
 
 	carttype = 0
 	mbcs[1].rombank = 0
@@ -275,6 +275,10 @@ func Reset() {
 	ramoffs = 0
 
 	log.Println("mmu: Reset")
+}
+
+func Boot() {
+	inbios = false
 }
 
 func Load(file string) {
@@ -299,5 +303,5 @@ func Load(file string) {
 
 	carttype = rom[0x0147]
 
-	log.Println("mmu: ROM loaded ", len(rom), " bytes")
+	log.Printf("mmu: ROM %q loaded: %d bytes", file, len(rom))
 }

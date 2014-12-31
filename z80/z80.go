@@ -6,81 +6,91 @@ import (
 	"github.com/dominichamon/goboy/mmu"
 )
 
-type registers struct {
+type Registers struct {
 	a, b, c, d, e, h, l, f byte
-	pc, sp, i, r           int // 16-bit
-	m                      int
-	ime                    int
+	Pc, sp, i, r           int // 16-bit
+	M                      int
+	Ime                    int
 }
 
 var (
-	r          registers
-	clock_m    int
-	halt, stop bool
+	R          Registers
+	Clock_m    int
+	Halt, Stop bool
 
-	opmap = map[opcode]interface{}{
-		NOP: func() { r.m = 1 },
-		LDBCnn: func() {
-			r.c = mmu.ReadByte(r.pc)
-			r.b = mmu.ReadByte(r.pc + 1)
-			r.pc += 2
-			r.m = 3
+	opmap = map[string]interface{}{
+		"NOP": func() { R.M = 1 },
+		"LDBCnn": func() {
+			R.c = mmu.ReadByte(R.Pc)
+			R.b = mmu.ReadByte(R.Pc + 1)
+			R.Pc += 2
+			R.M = 3
 		},
-		LDBCmA: func() {
-			mmu.WriteByte((int(r.b)<<8)+int(r.c), r.a)
-			r.m = 2
+		"LDBCmA": func() {
+			mmu.WriteByte((int(R.b)<<8)+int(R.c), R.a)
+			R.M = 2
 		},
-		INCBC: func() {
-			r.c = (r.c + 1) & 0xFF
-			if r.c == 0 {
-				r.b = (r.b + 1) & 0xFF
+		"INCBC": func() {
+			R.c = (R.c + 1) & 0xFF
+			if R.c == 0 {
+				R.b = (R.b + 1) & 0xFF
 			}
-			r.m = 1
+			R.M = 1
 		},
-		INCr_b: func() {
-			r.b = (r.b + 1) & 0xFF
-			r.f = 0
-			if r.b == 0 {
-				r.f = 0x80
+		"INCr_b": func() {
+			R.b = (R.b + 1) & 0xFF
+			R.f = 0
+			if R.b == 0 {
+				R.f = 0x80
 			}
-			r.m = 1
+			R.M = 1
+		},
+		"LDSPnn": func() {
+			R.sp = mmu.ReadWord(R.Pc)
+			R.Pc += 2
+			R.M = 3
 		},
 	}
 )
 
 func Reset() {
-	r.a = 0
-	r.b = 0
-	r.c = 0
-	r.d = 0
-	r.e = 0
-	r.h = 0
-	r.l = 0
-	r.f = 0
+	R.a = 0
+	R.b = 0
+	R.c = 0
+	R.d = 0
+	R.e = 0
+	R.h = 0
+	R.l = 0
+	R.f = 0
 
-	r.sp = 0
-	r.pc = 0
-	r.i = 0
-	r.r = 0
+	R.sp = 0
+	R.Pc = 0
+	R.i = 0
+	R.r = 0
 
-	r.m = 0
-	clock_m = 0
-	r.ime = 1
+	R.M = 0
+	Clock_m = 0
+	R.Ime = 1
 
-	halt = false
-	stop = false
+	Halt = false
+	Stop = false
 
 	log.Println("z80: Reset")
 }
 
-func Exec() {
-	r.r = (r.r + 1) & 0xFF
-	op := opcode(mmu.ReadByte(r.pc))
-	if f, ok := opmap[op]; ok {
+func Boot() {
+	R.Pc = 0x100
+	R.sp = 0xFFFE
+	R.a = 1
+	R.c = 0x13
+	R.e = 0xD8
+}
+
+func Call(opstr string) {
+	if f, ok := opmap[opstr]; ok {
 		f.(func())()
 	} else {
-		log.Panic("z80: No entry in opmap for op ", op)
+		log.Panic("z80: No entry in opmap for op ", opstr)
 	}
-	r.pc = (r.pc + 1) & 0xFFFF
-	clock_m += r.m
+
 }
