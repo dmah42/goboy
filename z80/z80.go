@@ -8,36 +8,36 @@ import (
 
 type registers struct {
 	a, b, c, d, e, h, l, f byte
-	pc, sp, i, r int  // 16-bit
-	m int
-	ime int
+	pc, sp, i, r           int // 16-bit
+	m                      int
+	ime                    int
 }
 
 var (
-	r registers
-	clock_m int
+	r          registers
+	clock_m    int
 	halt, stop bool
 
-	opmap = map[opcode]interface{} {
-		NOP:	func() { r.m = 1 },
-		LDBCnn:	func() {
+	opmap = map[opcode]interface{}{
+		NOP: func() { r.m = 1 },
+		LDBCnn: func() {
 			r.c = mmu.ReadByte(r.pc)
 			r.b = mmu.ReadByte(r.pc + 1)
 			r.pc += 2
 			r.m = 3
 		},
 		LDBCmA: func() {
-			mmu.WriteByte((int(r.b) << 8) + int(r.c), r.a)
+			mmu.WriteByte((int(r.b)<<8)+int(r.c), r.a)
 			r.m = 2
 		},
-		INCBC:	func() {
+		INCBC: func() {
 			r.c = (r.c + 1) & 0xFF
 			if r.c == 0 {
 				r.b = (r.b + 1) & 0xFF
 			}
 			r.m = 1
 		},
-		INCr_b:	func() {
+		INCr_b: func() {
 			r.b = (r.b + 1) & 0xFF
 			r.f = 0
 			if r.b == 0 {
