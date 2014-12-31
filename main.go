@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"time"
 	
@@ -15,6 +16,9 @@ func main() {
 	z80.Boot()
 	mmu.Boot()
 
+	if len(os.Args) < 2 {
+		log.Panic("no ROM file selected")
+	}
 	mmu.Load(os.Args[1])
 
 	// run
