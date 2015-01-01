@@ -11,7 +11,7 @@ type mbc struct {
 
 type mmu struct {
 	rom      []byte
-	carttype byte // TODO: enum?
+	carttype byte
 
 	romoffs, ramoffs int
 

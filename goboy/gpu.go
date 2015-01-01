@@ -94,7 +94,6 @@ func (g *gpu) Checkline() {
 				// end of hblank, last scanline: render
 				if g.curline == 143 {
 					g.linemode = 1
-					// TODO: render
 					MMU.If |= 1
 				} else {
 					g.linemode = 2
@@ -183,7 +182,7 @@ func (g *gpu) Checkline() {
 							}
 						}
 					}
-
+	
 					if g.objon {
 						cnt := 0
 						if g.objsize != 0 {
@@ -204,7 +203,26 @@ func (g *gpu) Checkline() {
 									}
 
 									linebase = (g.curline * SCREEN_WIDTH + obj.x) * 4
-									// TODO: if/else xflip
+
+									if obj.xflip {
+										for x := 0; x < 8; x += 1 {
+											if obj.x + x >= 0 && obj.x + x < SCREEN_WIDTH {
+												if tilerow[7-x] != 0 && (obj.prio != 0 || g.scanrow[x] == 0) {
+													g.Screen[linebase + 3] = pal[tilerow[7-x]]
+												}
+											}
+											linebase += 4
+										}
+									} else {
+										for x := 0; x < 8; x += 1 {
+											if obj.x + x >= 0 && obj.x + x < SCREEN_WIDTH {
+												if tilerow[x] != 0 && (obj.prio != 0 || g.scanrow[x] == 0) {
+													g.Screen[linebase + 3] = pal[tilerow[x]]
+												}
+											}
+											linebase += 4
+										}
+									}
 
 									cnt += 1
 									if cnt > 10 {
@@ -220,11 +238,60 @@ func (g *gpu) Checkline() {
 }
 
 func (g *gpu) UpdateTile(addr int, value byte) {
-	// TODO
+	if (addr & 0x1) != 0 {
+		addr -= 1
+	}
+	saddr := addr
+
+	tile := (addr >> 4) & 511
+	y := (addr >> 1) & 7
+	for x := 0; x < 8; x += 1 {
+		sx := byte(1 << uint(x))
+
+		t := 0
+		if g.vram[saddr] & sx != 0 {
+			t = 1
+		}
+		if g.vram[saddr+1] & sx != 0 {
+			t |= 2
+		}
+		g.tilemap[tile][y][x] = byte(t)
+	}
 }
 
 func (g *gpu) UpdateOAM(addr int, value byte) {
-	// TODO
+	addr -= 0xFE00
+
+	obj := addr >> 2
+	if obj < 40 {
+		switch addr & 3 {
+			case 0: g.od[obj].y = int(value) - 16
+			case 1: g.od[obj].x = int(value) - 8
+			case 2:
+				g.od[obj].tile = int(value)
+				if g.objsize != 0 {
+					g.od[obj].tile = int(value) & 0xFE
+				}
+			case 3:
+				g.od[obj].palette = 0
+				if (value & 0x10) != 0{
+					g.od[obj].palette = 1
+				}
+				g.od[obj].xflip = false
+				if (value & 0x20) != 0{
+					g.od[obj].xflip = true
+				}
+				g.od[obj].yflip = false
+				if (value & 0x40) != 0{
+					g.od[obj].yflip = true
+				}
+				g.od[obj].prio = 0
+				if (value & 0x80) != 0{
+					g.od[obj].prio = 1
+				}
+		}
+	}
+
 	for i := range g.od {
 		g.odsorted[i] = g.od[i]
 	}
@@ -236,9 +303,18 @@ func (g gpu) ReadByte(addr int) byte {
 	gaddr := addr - 0xFF40
 	switch gaddr {
 		case 0:
-			// TODO
+			value := 0
+			if g.lcdon { value |= 0x80 }
+			if g.bgtilebase == 0x0000 { value |= 0x10 }
+			if g.bgmapbase == 0x1C00 { value |= 0x08 }
+			if g.objsize != 0 { value |= 0x04 }
+			if g.objon { value |= 0x02 }
+			if g.bgon { value |= 0x01 }
+			return byte(value & 0xFF)
 		case 1:
-			// TODO
+			value := g.linemode
+			if g.curline == int(g.raster) { value |= 0x4 }
+			return byte(value & 0xFF)
 		case 2:
 			if g.yscrl { return 1 }
 			return 0
@@ -256,26 +332,62 @@ func (g *gpu) WriteByte(addr int, value byte) {
 	g.reg[gaddr] = value
 	switch gaddr {
 		case 0:
-			// TODO
+			g.lcdon = false
+			if (value & 0x80) != 0 { g.lcdon = true }
+			g.bgtilebase = 0x0800
+			if (value & 0x10) != 0 { g.bgtilebase = 0x0000 }
+			g.bgmapbase = 0x1800
+			if (value & 0x08) != 0 { g.bgmapbase = 0x1C00 }
+			g.objsize = 0
+			if (value & 0x04) != 0 { g.objsize = 1 }
+			g.objon = false
+			if (value & 0x02) != 0 { g.objon = true }
+			g.bgon = false
+			if (value & 0x01) != 0 { g.bgon = true }
 		case 2:
 			g.yscrl = false
-			if value != 0 {
-				g.yscrl = true
-			}
+			if value != 0 { g.yscrl = true }
 		case 3:
 			g.xscrl = false
-			if value != 0 {
-				g.xscrl = true
-			}
+			if value != 0 { g.xscrl = true }
 		case 5: g.raster = value
 		case 6:
-			// TODO: OAM DMA
+			// OAM DMA
+			for i := 0; i < SCREEN_WIDTH; i += 1 {
+				v := MMU.ReadByte(int(value << 8) + i)
+				g.oam[i] = v
+				g.UpdateOAM(0xFE00 + i, v)
+			}
 		case 7:
-			// TODO: BG palette mapping
+			// BG palette mapping
+			for i := uint(0); i < 4; i += 1 {
+				switch (value >> (i*2)) & 3 {
+					case 0: g.pal.bg[i] = 255
+					case 1: g.pal.bg[i] = 192
+					case 2: g.pal.bg[i] = 96
+					case 3: g.pal.bg[i] = 0
+				}
+			}
 
 		case 8:
-			// TODO: obj0 palette mapping
+			// obj0 palette mapping
+			for i := uint(0); i < 4; i += 1 {
+				switch (value >> (i*2)) & 3 {
+					case 0: g.pal.obj0[i] = 255
+					case 1: g.pal.obj0[i] = 192
+					case 2: g.pal.obj0[i] = 96
+					case 3: g.pal.obj0[i] = 0
+				}
+			}
 		case 9:
-			// TODO: obj1 palette mapping
+			// obj1 palette mapping
+			for i := uint(0); i < 4; i += 1 {
+				switch (value >> (i*2)) & 3 {
+					case 0: g.pal.obj1[i] = 255
+					case 1: g.pal.obj1[i] = 192
+					case 2: g.pal.obj1[i] = 96
+					case 3: g.pal.obj1[i] = 0
+				}
+			}
 	}
 }
