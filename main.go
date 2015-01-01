@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/dominichamon/goboy/goboy"
@@ -74,6 +75,18 @@ const (
 
 				pause();
 
+				window.onkeydown = function(e) {
+					var req = new XMLHttpRequest();
+					req.open('GET', '/keydown?keycode=' + e.keyCode, true);
+					req.send();
+				}
+
+				window.onkeyup = function(e) {
+					var req = new XMLHttpRequest();
+					req.open('GET', '/keyup?keycode=' + e.keyCode, true);
+					req.send();
+				}
+
 				window.requestAnimationFrame(frame);
 			</script>
 		</body>
@@ -96,6 +109,8 @@ func main() {
 	http.HandleFunc("/run", runHandler)
 	http.HandleFunc("/pause", pauseHandler)
 	http.HandleFunc("/frame", frameHandler)
+	http.HandleFunc("/keydown", keydownHandler)
+	http.HandleFunc("/keyup", keyupHandler)
 
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
 		log.Panicf("failed to start listening on port %d: %v", *port, err)
@@ -122,11 +137,31 @@ func pauseHandler(w http.ResponseWriter, r *http.Request) {
 func frameHandler(w http.ResponseWriter, r *http.Request) {
 	b, err := json.Marshal(goboy.GPU.Screen)
 	if err != nil {
-		log.Printf("goboy: screen marshal error: %+v", err)
+		log.Println("goboy: screen marshal error: ", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)
+}
+
+func keydownHandler(w http.ResponseWriter, r *http.Request) {
+	keycode, err := strconv.ParseInt(r.URL.Query().Get("keycode"), 10, 8)
+	if err != nil {
+		log.Printf("goboy: keycode parse error: ", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	log.Println("Keydown: ", keycode)
+	goboy.Key.Keydown(byte(keycode))
+}
+
+func keyupHandler(w http.ResponseWriter, r *http.Request) {
+	keycode, err := strconv.ParseInt(r.URL.Query().Get("keycode"), 10, 8)
+	if err != nil {
+		log.Printf("goboy: keycode parse error: ", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	log.Println("Keyup: ", keycode)
+	goboy.Key.Keyup(byte(keycode))
 }
