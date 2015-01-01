@@ -63,16 +63,7 @@ var (
 	}
 )
 
-func (z *z80) Boot() {
-	z.R.Pc = 0x100
-	z.R.sp = 0xFFFE
-	z.R.a = 1
-	z.R.c = 0x13
-	z.R.e = 0xD8
-}
-
 func (z z80) Call(opstr string) {
-	log.Printf("z80: Call %q\n", opstr)
 	if f, ok := opmap[opstr]; ok {
 		f.(func())()
 	} else {

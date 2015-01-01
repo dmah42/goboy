@@ -246,10 +246,6 @@ func (m *mmu) WriteWord(addr, value int) {
 	m.WriteByte(addr+1, byte((value>>8)&0xFF))
 }
 
-func (m *mmu) Boot() {
-	m.inbios = false
-}
-
 func (m *mmu) Load(file string) {
 	f, err := os.Open(file)
 	if err != nil {
