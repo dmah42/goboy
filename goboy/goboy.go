@@ -9,6 +9,7 @@ var (
 	MMU = makeMMU()
 	Z80 = makeZ80()
 	Key = makeKey()
+	GPU = makeGPU()
 
 	Timer	timer
 )
@@ -69,15 +70,17 @@ func frame() {
 			}
 		}
 		Z80.M += Z80.R.M
-		// TODO: gpu.checkline()
+		GPU.Checkline()
 		Timer.Inc()
-/*
-		log.Printf("z80: %+v\n", Z80)
-		log.Printf("mmu: %+v %+v %+v\n", MMU.inbios, MMU.Ie, MMU.If)
-		log.Printf("timer: %+v\n", Timer)
-		log.Printf("key: %+v\n", Key)
-		log.Println("-----------------")
-*/
+
+		// log.Printf("z80: %+v\n", Z80)
+		// log.Printf("mmu: %+v %+v %+v\n", MMU.inbios, MMU.Ie, MMU.If)
+		// log.Printf("timer: %+v\n", Timer)
+		// log.Printf("key: %+v\n", Key)
+		// log.Printf("gpu: %+v %+v %+v\n", GPU.linemode, GPU.modeclocks, GPU.curline)
+		// log.Println("-----------------")
+
+		//time.Sleep(250 * time.Millisecond)
 	}
 	//log.Printf("fps: %.3f\n", 1.0 / time.Since(t0).Seconds())
 }

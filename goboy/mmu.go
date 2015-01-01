@@ -78,9 +78,7 @@ func (m mmu) ReadByte(addr int) byte {
 
 	// VRAM
 	case 0x8000, 0x9000:
-		// TODO
-		//return gpu.vram[addr & 0x1FFF]
-		return 0
+		return GPU.vram[addr & 0x1FFF]
 
 	// External RAM
 	case 0xA000, 0xB000:
@@ -100,8 +98,7 @@ func (m mmu) ReadByte(addr int) byte {
 		// OAM
 		case 0xE00:
 			if (addr & 0xFF) < 0xA0 {
-				// TODO
-				//return gpu.oam[addr & 0xFF]
+				return GPU.oam[addr & 0xFF]
 			}
 			return 0
 
@@ -125,9 +122,7 @@ func (m mmu) ReadByte(addr int) byte {
 					return 0
 
 				case 0x40, 0x50, 0x60, 0x70:
-					// TODO
-					//return gpu.ReadByte(addr)
-					return 0
+					return GPU.ReadByte(addr)
 				}
 			}
 		}
@@ -185,9 +180,8 @@ func (m *mmu) WriteByte(addr int, value byte) {
 
 	// VRAM
 	case 0x8000, 0x9000:
-		// TODO
-		//gpu.vram[addr & 0x1FFF] = value
-		//gpu.updatetile(addr & 0x1FFF, value)
+		GPU.vram[addr & 0x1FFF] = value
+		GPU.UpdateTile(addr & 0x1FFF, value)
 		return
 
 	// External RAM
@@ -208,9 +202,8 @@ func (m *mmu) WriteByte(addr int, value byte) {
 		// OAM
 		case 0xE00:
 			if (addr & 0xFF) < 0xA0 {
-				// TODO
-				//gpu.oam[addr & 0xFF] = value
-				//gpu.updateoam(addr, value)
+				GPU.oam[addr & 0xFF] = value
+				GPU.UpdateOAM(addr, value)
 			}
 
 		// Zeropage RAM, IO, interrupts
@@ -232,8 +225,7 @@ func (m *mmu) WriteByte(addr int, value byte) {
 					return
 
 				case 0x40, 0x50, 0x60, 0x70:
-					// TODO
-					//gpu.WriteByte(addr, value)
+					GPU.WriteByte(addr, value)
 				}
 			}
 		}
