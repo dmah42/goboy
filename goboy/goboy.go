@@ -12,23 +12,9 @@ var (
 	GPU = makeGPU()
 
 	Timer	timer
+
+	Run = false
 )
-
-func init() {
-	Z80.R.Pc = 0x100
-	Z80.R.sp = 0xFFFE
-	Z80.R.a = 1
-	Z80.R.c = 0x13
-	Z80.R.e = 0xD8
-	Z80.R.h = 0x01
-	Z80.R.l = 0x4D
-
-	MMU.inbios = false
-}
-
-func LoadROM(rom string) {
-	MMU.Load(rom)
-}
 
 func frame() {
 	fclock := Z80.M + 17556
@@ -85,13 +71,24 @@ func frame() {
 	//log.Printf("fps: %.3f\n", 1.0 / time.Since(t0).Seconds())
 }
 
-func Run() {
-	// run
-	Z80.Stop = false
-	for !Z80.Stop {
+func Loop(rom string) {
+	Z80.R.Pc = 0x100
+	Z80.R.sp = 0xFFFE
+	Z80.R.a = 1
+	Z80.R.c = 0x13
+	Z80.R.e = 0xD8
+	Z80.R.h = 0x01
+	Z80.R.l = 0x4D
+
+	MMU.inbios = false
+
+	MMU.Load(rom)
+
+	log.Println("goboy: Starting loop")
+	for {
 		select {
 			case <-time.After(time.Millisecond):
-				frame()
+				if Run { frame() }
 		}
 	}
 }

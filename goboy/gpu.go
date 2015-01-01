@@ -95,7 +95,6 @@ func (g *gpu) Checkline() {
 				if g.curline == 143 {
 					g.linemode = 1
 					// TODO: render
-					log.Println("********** ")
 					MMU.If |= 1
 				} else {
 					g.linemode = 2

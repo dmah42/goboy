@@ -14,7 +14,7 @@ type registers struct {
 type z80 struct {
 	R	registers
 	M	int
-	Halt, Stop	bool
+	Halt	bool
 }
 
 func makeZ80() z80 {
