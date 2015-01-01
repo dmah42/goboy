@@ -3,6 +3,8 @@ package mmu
 import (
 	"log"
 	"os"
+
+	"github.com/dominichamon/goboy/timer"
 )
 
 type mbc struct {
@@ -111,9 +113,7 @@ func ReadByte(addr int) byte {
 						// return key.ReadByte()  // joyp
 						return 0
 					case 4, 5, 6, 7:
-						// TODO
-						//return timer.ReadByte(addr)
-						return 0
+						return timer.ReadByte(addr)
 					case 15:
 						return If
 					default:
@@ -226,8 +226,7 @@ func WriteByte(addr int, value byte) {
 						// TODO
 						// key.WriteByte(value)  // joyp
 					case 4, 5, 6, 7:
-						// TODO
-						//return timer.WriteByte(addr, value)
+						timer.WriteByte(addr, value)
 					case 15:
 						If = value
 					}

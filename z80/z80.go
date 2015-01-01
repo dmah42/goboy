@@ -50,6 +50,10 @@ var (
 			R.Pc += 2
 			R.M = 3
 		},
+		"JPnn": func() {
+			R.Pc = mmu.ReadWord(R.Pc)
+			R.M = 3
+		},
 	}
 )
 
@@ -87,10 +91,10 @@ func Boot() {
 }
 
 func Call(opstr string) {
+	log.Printf("z80: Call %q\n", opstr)
 	if f, ok := opmap[opstr]; ok {
 		f.(func())()
 	} else {
 		log.Panic("z80: No entry in opmap for op ", opstr)
 	}
-
 }
