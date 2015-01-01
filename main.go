@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
@@ -47,7 +48,33 @@ const (
 					document.getElementById('run').onclick = run;
 				}
 
+				var frame = function() {
+					var req = new XMLHttpRequest();
+					req.onload = render
+					req.open('GET', '/frame', false);
+					req.send();
+
+					window.requestAnimationFrame(frame);
+				}
+
+				var render = function() {
+					var screen = document.getElementById('screen');
+					var ctx = screen.getContext('2d');
+					var b = ctx.getImageData(0, 0, screen.width, screen.height);
+
+					var screenData = JSON.parse(this.responseText);
+
+					// TODO: scale up canvas
+					for (var i = 0; i < screenData.length; ++i) {
+						b.data[i] = screenData[i];
+					}
+
+					ctx.putImageData(b, 0, 0);
+				}
+
 				pause();
+
+				window.requestAnimationFrame(frame);
 			</script>
 		</body>
 	</html>`
@@ -68,6 +95,7 @@ func main() {
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/run", runHandler)
 	http.HandleFunc("/pause", pauseHandler)
+	http.HandleFunc("/frame", frameHandler)
 
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
 		log.Panicf("failed to start listening on port %d: %v", *port, err)
@@ -89,4 +117,16 @@ func pauseHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Pause")
 	goboy.Run = false
 	w.WriteHeader(http.StatusOK)
+}
+
+func frameHandler(w http.ResponseWriter, r *http.Request) {
+	b, err := json.Marshal(goboy.GPU.Screen)
+	if err != nil {
+		log.Printf("goboy: screen marshal error: %+v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(b)
 }

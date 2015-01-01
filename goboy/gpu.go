@@ -42,7 +42,7 @@ type gpu struct {
 	tilemap [512][8][8]byte
 	pal palette
 
-	scrn [SCREEN_WIDTH*SCREEN_HEIGHT*4]byte
+	Screen [SCREEN_WIDTH*SCREEN_HEIGHT*4]byte
 
 	curline int
 	curscan, linemode, modeclocks int
@@ -66,8 +66,8 @@ func makeGPU() gpu {
 	}
 
 	log.Printf("gpu: initializing screen")
-	for i := range g.scrn {
-		g.scrn[i] = 255
+	for i := range g.Screen {
+		g.Screen[i] = 255
 	}
 
 	g.linemode = 2
@@ -154,7 +154,7 @@ func (g *gpu) Checkline() {
 							tilerow := g.tilemap[tile][y]
 							for w := SCREEN_WIDTH; w > 0; w -= 1 {
 								g.scanrow[SCREEN_WIDTH-x] = tilerow[x]
-								g.scrn[linebase + 3] = g.pal.bg[tilerow[x]]
+								g.Screen[linebase + 3] = g.pal.bg[tilerow[x]]
 								x += 1
 								if x == 8 {
 									t = (t + 1) & 31
@@ -172,7 +172,7 @@ func (g *gpu) Checkline() {
 							tilerow := g.tilemap[g.vram[mapbase+t]][y]
 							for w := SCREEN_WIDTH; w > 0; w -= 1 {
 								g.scanrow[SCREEN_WIDTH-x] = tilerow[x]
-								g.scrn[linebase + 3] = g.pal.bg[tilerow[x]]
+								g.Screen[linebase + 3] = g.pal.bg[tilerow[x]]
 								x += 1
 								if x == 8 {
 									t = (t + 1) & 31
