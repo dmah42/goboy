@@ -1,4 +1,4 @@
-package z80
+package goboy
 
 var Opcodes = [0x100]string{
 	// 0x00

@@ -1,14 +1,36 @@
-package mmu
+package goboy
 
 import (
 	"log"
 	"os"
-
-	"github.com/dominichamon/goboy/timer"
 )
 
 type mbc struct {
 	rombank, rambank, ramon, mode byte
+}
+
+type mmu struct {
+	rom      []byte
+	carttype byte // TODO: enum?
+
+	romoffs, ramoffs int
+
+	inbios bool
+	Ie     byte
+	If byte
+
+	mbcs [2]mbc
+
+	eram [32768]byte
+	wram [8192]byte
+	zram [127]byte
+}
+
+func makeMMU() mmu {
+	var m mmu
+	m.inbios = true
+	m.romoffs = 0x4000
+	return m
 }
 
 var (
@@ -30,44 +52,29 @@ var (
 		0x21, 0x04, 0x01, 0x11, 0xA8, 0x00, 0x1A, 0x13, 0xBE, 0x20, 0xFE, 0x23, 0x7D, 0xFE, 0x34, 0x20,
 		0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50,
 	}
-
-	rom      []byte
-	carttype byte // TODO: enum?
-
-	romoffs, ramoffs int
-
-	inbios bool
-	Ie     byte
-	If byte
-
-	mbcs [2]mbc
-
-	eram [32768]byte
-	wram [8192]byte
-	zram [127]byte
 )
 
-func ReadByte(addr int) byte {
+func (m mmu) ReadByte(addr int) byte {
 	switch addr & 0xF000 {
 	// ROM bank 0
 	case 0x0000:
-		if inbios {
+		if m.inbios {
 			if addr < 0x0100 {
 				return bios[addr]
 			} else if addr == 0x0100 {
-				inbios = false
+				m.inbios = false
 				log.Println("mmu: Leaving bios")
 			}
 		} else {
-			return rom[addr]
+			return m.rom[addr]
 		}
 
 	case 0x1000, 0x2000, 0x3000:
-		return rom[addr]
+		return m.rom[addr]
 
 	// ROM bank 1
 	case 0x4000, 0x5000, 0x6000, 0x7000:
-		return rom[romoffs+(addr&0x3FFF)]
+		return m.rom[m.romoffs+(addr&0x3FFF)]
 
 	// VRAM
 	case 0x8000, 0x9000:
@@ -77,18 +84,18 @@ func ReadByte(addr int) byte {
 
 	// External RAM
 	case 0xA000, 0xB000:
-		return eram[ramoffs+(addr&0x1FFF)]
+		return m.eram[m.ramoffs+(addr&0x1FFF)]
 
 	// Work RAM and echo
 	case 0xC000, 0xD000, 0xE000:
-		return wram[addr&0x1FFF]
+		return m.wram[addr&0x1FFF]
 
 	// Everything else
 	case 0xF000:
 		switch addr & 0x0F00 {
 		// Echo RAM
 		case 0x000, 0x100, 0x200, 0x300, 0x400, 0x500, 0x600, 0x700, 0x800, 0x900, 0xA00, 0xB00, 0xC00, 0xD00:
-			return wram[addr&0x1FFF]
+			return m.wram[addr&0x1FFF]
 
 		// OAM
 		case 0xE00:
@@ -101,23 +108,17 @@ func ReadByte(addr int) byte {
 		// Zeropage RAM, IO, interrupts
 		case 0xF00:
 			if addr == 0xFFFF {
-				return Ie
+				return m.Ie
 			} else if addr > 0xFF7F {
-				return zram[addr&0x7F]
+				return m.zram[addr&0x7F]
 			} else {
 				switch addr & 0xF0 {
 				case 0x00:
 					switch addr & 0xF {
-					case 0:
-						// TODO
-						// return key.ReadByte()  // joyp
-						return 0
-					case 4, 5, 6, 7:
-						return timer.ReadByte(addr)
-					case 15:
-						return If
-					default:
-						return 0
+					case 0: return Key.ReadByte()  // joyp
+					case 4, 5, 6, 7: return Timer.ReadByte(addr)
+					case 15: return m.If
+					default: return 0
 					}
 
 				case 0x10, 0x20, 0x30:
@@ -135,51 +136,51 @@ func ReadByte(addr int) byte {
 	return 0
 }
 
-func ReadWord(addr int) int {
-	return int(ReadByte(addr)) + int((ReadByte(addr+1) << 8))
+func (m mmu) ReadWord(addr int) int {
+	return int(m.ReadByte(addr)) + int((m.ReadByte(addr+1) << 8))
 }
 
-func WriteByte(addr int, value byte) {
+func (m *mmu) WriteByte(addr int, value byte) {
 	switch addr & 0xF000 {
 	// ROM bank 0
 	// MBC1: turn external RAM on
 	case 0x0000, 0x1000:
-		if carttype == 1 {
-			mbcs[1].ramon = 0
+		if m.carttype == 1 {
+			m.mbcs[1].ramon = 0
 			if (value & 0xF) == 0xA {
-				mbcs[1].ramon = 1
+				m.mbcs[1].ramon = 1
 			}
 		}
 
 	// MBC1: ROM bank switch
 	case 0x2000, 0x3000:
-		if carttype == 1 {
-			mbcs[1].rombank &= 0x60
+		if m.carttype == 1 {
+			m.mbcs[1].rombank &= 0x60
 			value &= 0x1F
 			if value == 0 {
 				value = 1
 			}
-			mbcs[1].rombank |= value
-			romoffs = int(mbcs[1].rombank) * 0x4000
+			m.mbcs[1].rombank |= value
+			m.romoffs = int(m.mbcs[1].rombank) * 0x4000
 		}
 
 	// ROM bank 1
 	// MBC1: RAM bank switch
 	case 0x4000, 0x5000:
-		if carttype == 1 {
-			if mbcs[1].mode == 0 {
-				mbcs[1].rombank &= 0x1F
-				mbcs[1].rombank |= ((value & 3) << 5)
-				romoffs = int(mbcs[1].rombank) * 0x4000
+		if m.carttype == 1 {
+			if m.mbcs[1].mode == 0 {
+				m.mbcs[1].rombank &= 0x1F
+				m.mbcs[1].rombank |= ((value & 3) << 5)
+				m.romoffs = int(m.mbcs[1].rombank) * 0x4000
 			} else {
-				mbcs[1].rambank = value & 3
-				ramoffs = int(mbcs[1].rambank) * 0x2000
+				m.mbcs[1].rambank = value & 3
+				m.ramoffs = int(m.mbcs[1].rambank) * 0x2000
 			}
 		}
 
 	case 0x6000, 0x7000:
-		if carttype == 1 {
-			mbcs[1].mode = value & 0x1
+		if m.carttype == 1 {
+			m.mbcs[1].mode = value & 0x1
 		}
 
 	// VRAM
@@ -191,18 +192,18 @@ func WriteByte(addr int, value byte) {
 
 	// External RAM
 	case 0xA000, 0xB000:
-		eram[ramoffs+(addr&0x1FFF)] = value
+		m.eram[m.ramoffs+(addr&0x1FFF)] = value
 
 	// Work RAM and echo
 	case 0xC000, 0xD000, 0xE000:
-		wram[addr&0x1FFF] = value
+		m.wram[addr&0x1FFF] = value
 
 	// Everything else
 	case 0xF000:
 		switch addr & 0x0F00 {
 		// Echo RAM
 		case 0x000, 0x100, 0x200, 0x300, 0x400, 0x500, 0x600, 0x700, 0x800, 0x900, 0xA00, 0xB00, 0xC00, 0xD00:
-			wram[addr&0x1FFF] = value
+			m.wram[addr&0x1FFF] = value
 
 		// OAM
 		case 0xE00:
@@ -215,20 +216,16 @@ func WriteByte(addr int, value byte) {
 		// Zeropage RAM, IO, interrupts
 		case 0xF00:
 			if addr == 0xFFFF {
-				Ie = value
+				m.Ie = value
 			} else if addr > 0xFF7F {
-				zram[addr&0x7F] = value
+				m.zram[addr&0x7F] = value
 			} else {
 				switch addr & 0xF0 {
 				case 0x00:
 					switch addr & 0xF {
-					case 0:
-						// TODO
-						// key.WriteByte(value)  // joyp
-					case 4, 5, 6, 7:
-						timer.WriteByte(addr, value)
-					case 15:
-						If = value
+					case 0: Key.WriteByte(value)  // joyp
+					case 4, 5, 6, 7: Timer.WriteByte(addr, value)
+					case 15: m.If = value
 					}
 
 				case 0x10, 0x20, 0x30:
@@ -244,43 +241,16 @@ func WriteByte(addr int, value byte) {
 	log.Panic("Failed to write byte to ", addr)
 }
 
-func WriteWord(addr, value int) {
-	WriteByte(addr, byte(value&0xFF))
-	WriteByte(addr+1, byte((value>>8)&0xFF))
+func (m *mmu) WriteWord(addr, value int) {
+	m.WriteByte(addr, byte(value&0xFF))
+	m.WriteByte(addr+1, byte((value>>8)&0xFF))
 }
 
-func Reset() {
-	for i := range eram {
-		eram[i] = 0
-	}
-	for i := range wram {
-		wram[i] = 0
-	}
-	for i := range zram {
-		zram[i] = 0
-	}
-
-	inbios = true
-	Ie = 0
-	If = 0
-
-	carttype = 0
-	mbcs[1].rombank = 0
-	mbcs[1].rambank = 0
-	mbcs[1].ramon = 0
-	mbcs[1].mode = 0
-
-	romoffs = 0x4000
-	ramoffs = 0
-
-	log.Println("mmu: Reset")
+func (m *mmu) Boot() {
+	m.inbios = false
 }
 
-func Boot() {
-	inbios = false
-}
-
-func Load(file string) {
+func (m *mmu) Load(file string) {
 	f, err := os.Open(file)
 	if err != nil {
 		panic(err)
@@ -291,8 +261,8 @@ func Load(file string) {
 		panic(err)
 	}
 
-	rom = make([]byte, fi.Size())
-	n, err := f.Read(rom)
+	m.rom = make([]byte, fi.Size())
+	n, err := f.Read(m.rom)
 	if err != nil {
 		panic(err)
 	}
@@ -300,7 +270,7 @@ func Load(file string) {
 		log.Panic(n, " read vs ", fi.Size(), " expected")
 	}
 
-	carttype = rom[0x0147]
+	m.carttype = m.rom[0x0147]
 
-	log.Printf("mmu: ROM %q loaded: %d bytes", file, len(rom))
+	log.Printf("mmu: ROM %q loaded: %d bytes", file, len(m.rom))
 }
