@@ -11,13 +11,14 @@ const (
 )
 
 type palette struct {
-	bg [4]byte
-	obj0 [4]byte
-	obj1 [4]byte
+	bg [4]uint8
+	obj0 [4]uint8
+	obj1 [4]uint8
 }
 
 type objdata struct {
-	x, y, tile, palette int
+	x, y int16
+	tile, palette int
 	yflip, xflip bool
 	prio int
 	num int
@@ -36,25 +37,28 @@ type objdata struct {
 // }
 
 type gpu struct {
-	vram, oam, reg []byte
+	vram [8192]uint8
+	oam [SCREEN_WIDTH]uint8
+	reg [0xBF]uint8
 	od, odsorted [40]objdata
-	scanrow [SCREEN_WIDTH]byte
-	tilemap [512][8][8]byte
+	scanrow [SCREEN_WIDTH]uint8
+	tilemap [512][8][8]uint8
 	pal palette
 
-	Screen [SCREEN_WIDTH*SCREEN_HEIGHT*4]byte
+	Screen [SCREEN_WIDTH*SCREEN_HEIGHT*4]uint8
 
-	curline int
-	curscan, linemode, modeclocks int
+	curline uint8
+	curscan uint16
+	linemode, modeclocks int
 
 	yscrl, xscrl bool
-	raster, ints byte
+	raster, ints uint8
 
 	lcdon, bgon, objon, winon bool
 
 	objsize int
 
-	bgtilebase, bgmapbase, wintilebase int
+	bgtilebase, bgmapbase, wintilebase uint16
 }
 
 func makeGPU() gpu {
@@ -131,7 +135,7 @@ func (g *gpu) Checkline() {
 				if g.lcdon {
 					if g.bgon {
 						linebase := g.curscan
-						yscrl := 0
+						var yscrl uint8 = 0
 						if g.yscrl {
 							yscrl = 1
 						}
@@ -139,10 +143,10 @@ func (g *gpu) Checkline() {
 						if g.xscrl {
 							xscrl = 1
 						}
-						mapbase := g.bgmapbase + ((((g.curline + yscrl) & 0xFF) >> 3) << 5)
+						mapbase := g.bgmapbase + uint16((((g.curline + yscrl) & 0xFF) >> 3) << 5)
 						y := (g.curline + yscrl) & 7
 						x := xscrl & 7
-						t := (xscrl >> 3) & 31
+						t := uint16(xscrl >> 3) & 31
 
 						if g.bgtilebase != 0 {
 							tile := g.vram[mapbase + t]
@@ -188,13 +192,14 @@ func (g *gpu) Checkline() {
 						if g.objsize != 0 {
 							// TODO
 						} else {
-							linebase := g.curscan
+							linebase := int16(g.curscan)
 							for i := range g.od {
 								obj := g.odsorted[i]
-								if obj.y <= g.curline && obj.y + 8 > g.curline {
-									tilerow := g.tilemap[obj.tile][g.curline - obj.y]
+								var curline int16 = int16(g.curline)
+								if obj.y <= curline && obj.y + 8 > curline {
+									tilerow := g.tilemap[obj.tile][curline - obj.y]
 									if obj.yflip {
-										tilerow = g.tilemap[obj.tile][7 - (g.curline - obj.y)]
+										tilerow = g.tilemap[obj.tile][7 - (curline - obj.y)]
 									}
 
 									pal := g.pal.obj0
@@ -202,10 +207,10 @@ func (g *gpu) Checkline() {
 										pal = g.pal.obj1
 									}
 
-									linebase = (g.curline * SCREEN_WIDTH + obj.x) * 4
+									linebase = (curline * SCREEN_WIDTH + obj.x) * 4
 
 									if obj.xflip {
-										for x := 0; x < 8; x += 1 {
+										for x := int16(0); x < 8; x += 1 {
 											if obj.x + x >= 0 && obj.x + x < SCREEN_WIDTH {
 												if tilerow[7-x] != 0 && (obj.prio != 0 || g.scanrow[x] == 0) {
 													g.Screen[linebase + 3] = pal[tilerow[7-x]]
@@ -214,7 +219,7 @@ func (g *gpu) Checkline() {
 											linebase += 4
 										}
 									} else {
-										for x := 0; x < 8; x += 1 {
+										for x := int16(0); x < 8; x += 1 {
 											if obj.x + x >= 0 && obj.x + x < SCREEN_WIDTH {
 												if tilerow[x] != 0 && (obj.prio != 0 || g.scanrow[x] == 0) {
 													g.Screen[linebase + 3] = pal[tilerow[x]]
@@ -237,7 +242,7 @@ func (g *gpu) Checkline() {
 	}
 }
 
-func (g *gpu) UpdateTile(addr int, value byte) {
+func (g *gpu) UpdateTile(addr uint16, value uint8) {
 	if (addr & 0x1) != 0 {
 		addr -= 1
 	}
@@ -259,14 +264,14 @@ func (g *gpu) UpdateTile(addr int, value byte) {
 	}
 }
 
-func (g *gpu) UpdateOAM(addr int, value byte) {
+func (g *gpu) UpdateOAM(addr uint16, value uint8) {
 	addr -= 0xFE00
 
 	obj := addr >> 2
 	if obj < 40 {
 		switch addr & 3 {
-			case 0: g.od[obj].y = int(value) - 16
-			case 1: g.od[obj].x = int(value) - 8
+			case 0: g.od[obj].y = int16(value) - 16
+			case 1: g.od[obj].x = int16(value) - 8
 			case 2:
 				g.od[obj].tile = int(value)
 				if g.objsize != 0 {
@@ -299,7 +304,7 @@ func (g *gpu) UpdateOAM(addr int, value byte) {
 	// sort.Sort(g.odsorted)
 }
 
-func (g gpu) ReadByte(addr int) byte {
+func (g gpu) ReadByte(addr uint16) uint8 {
 	gaddr := addr - 0xFF40
 	switch gaddr {
 		case 0:
@@ -313,8 +318,8 @@ func (g gpu) ReadByte(addr int) byte {
 			return byte(value & 0xFF)
 		case 1:
 			value := g.linemode
-			if g.curline == int(g.raster) { value |= 0x4 }
-			return byte(value & 0xFF)
+			if g.curline == g.raster { value |= 0x4 }
+			return uint8(value & 0xFF)
 		case 2:
 			if g.yscrl { return 1 }
 			return 0
@@ -327,7 +332,7 @@ func (g gpu) ReadByte(addr int) byte {
 	return g.reg[gaddr]
 }
 
-func (g *gpu) WriteByte(addr int, value byte) {
+func (g *gpu) WriteByte(addr uint16, value uint8) {
 	gaddr := addr - 0xFF40
 	g.reg[gaddr] = value
 	switch gaddr {
@@ -353,10 +358,10 @@ func (g *gpu) WriteByte(addr int, value byte) {
 		case 5: g.raster = value
 		case 6:
 			// OAM DMA
-			for i := 0; i < SCREEN_WIDTH; i += 1 {
-				v := MMU.ReadByte(int(value << 8) + i)
+			for i := uint16(0); i < SCREEN_WIDTH; i += 1 {
+				v := MMU.ReadByte(uint16(value << 8) + i)
 				g.oam[i] = v
-				g.UpdateOAM(0xFE00 + i, v)
+				g.UpdateOAM(uint16(0xFE00) + i, v)
 			}
 		case 7:
 			// BG palette mapping

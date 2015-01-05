@@ -18,23 +18,23 @@ var (
 
 func frame() {
 	fclock := Z80.M + 17556
-	// t0 := time.Now()
+	t0 := time.Now()
 	for Z80.M < fclock {
 		if Z80.Halt {
 			Z80.Call("NOP")
 		} else {
 			Z80.R.r = (Z80.R.r + 1) & 0xFF
 			op := MMU.ReadByte(Z80.R.Pc)
-			//log.Printf("op [%x] %q\n", op, Opcodes[op])
+			log.Printf("op [%x] %q\n", op, Opcodes[op])
+			Z80.R.Pc = Z80.R.Pc + 1
 			Z80.Call(Opcodes[op])
-			Z80.R.Pc = (Z80.R.Pc + 1) & 0xFFFF
 		}
 
 		// check for interrupts
-		if Z80.R.Ime != 0 && MMU.Ie != 0 && MMU.If != 0 {
+		if Z80.R.Ime && MMU.Ie != 0 && MMU.If != 0 {
 			log.Printf("int %x %x %x\n", Z80.R.Ime, MMU.Ie, MMU.If)
 			Z80.Halt = false
-			Z80.R.Ime = 0
+			Z80.R.Ime = false
 			ifired := MMU.Ie & MMU.If
 			if (ifired & 1) != 0 {
 				MMU.If &= 0xFE
@@ -52,9 +52,10 @@ func frame() {
 				MMU.If &= 0xEF
 				Z80.Call("RST60")
 			} else {
-				Z80.R.Ime = 1
+				Z80.R.Ime = true
 			}
 		}
+		log.Printf("z80: %#v\n", Z80)
 		Z80.M += Z80.R.M
 		GPU.Checkline()
 		Timer.Inc()
@@ -65,10 +66,8 @@ func frame() {
 		// log.Printf("key: %+v\n", Key)
 		// log.Printf("gpu: %+v %+v %+v\n", GPU.linemode, GPU.modeclocks, GPU.curline)
 		// log.Println("-----------------")
-
-		//time.Sleep(250 * time.Millisecond)
 	}
-	//log.Printf("fps: %.3f\n", 1.0 / time.Since(t0).Seconds())
+	log.Printf("frame time: %.3f s\n", time.Since(t0).Seconds())
 }
 
 func Loop(rom string) {
@@ -77,14 +76,12 @@ func Loop(rom string) {
 	Z80.R.a = 1
 	Z80.R.c = 0x13
 	Z80.R.e = 0xD8
-	Z80.R.h = 0x01
-	Z80.R.l = 0x4D
 
 	MMU.inbios = false
 
 	MMU.Load(rom)
 
-	log.Println("goboy: Starting loop")
+	log.Println("goboy: Starting loop [", Run, "]")
 	for {
 		select {
 			case <-time.After(time.Millisecond):

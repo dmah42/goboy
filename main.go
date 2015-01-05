@@ -7,7 +7,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -22,6 +21,9 @@ const (
 	<html>
 		<head>
 			<title>goboy</title>
+			<style type="text/css">
+				body { background-color: black; color: white; }
+			</style>
 		</head>
 		<body>
 			<h1>goboy</h1>
@@ -95,15 +97,22 @@ const (
 
 var (
 	port = flag.Int("port", 8888, "Port on which to listen")
+	rom = flag.String("rom", "roms/ttt.gb", "The ROM to load and run")
+	run = flag.Bool("run", false, "Run the emulator automatically")
 
 	rootTemplate = template.Must(template.New("root").Parse(rootHTML))
 )
 
 func main() {
-	if len(os.Args) < 2 {
+	flag.Parse()
+
+	if len(*rom) == 0 {
 		log.Panic("no ROM file selected")
 	}
-	go goboy.Loop(os.Args[1])
+
+	goboy.Run = *run
+
+	go goboy.Loop(*rom)
 
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/run", runHandler)
@@ -135,6 +144,7 @@ func pauseHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func frameHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: get registers as well as screen data
 	b, err := json.Marshal(goboy.GPU.Screen)
 	if err != nil {
 		log.Println("goboy: screen marshal error: ", err)

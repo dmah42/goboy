@@ -57,7 +57,7 @@ func (t *timer) Inc() {
 	}
 }
 
-func (t timer) ReadByte(addr int) byte {
+func (t timer) ReadByte(addr uint16) uint8 {
 	switch addr {
 		case 0xFF04:
 			return t.div
@@ -72,7 +72,7 @@ func (t timer) ReadByte(addr int) byte {
 	return 0
 }
 
-func (t *timer) WriteByte(addr int, value byte) {
+func (t *timer) WriteByte(addr uint16, value uint8) {
 	switch addr {
 		case 0xFF04:
 			t.div = 0

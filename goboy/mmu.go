@@ -6,24 +6,24 @@ import (
 )
 
 type mbc struct {
-	rombank, rambank, ramon, mode byte
+	rombank, rambank, ramon, mode uint8
 }
 
 type mmu struct {
-	rom      []byte
-	carttype byte
+	rom      []uint8
+	carttype uint8
 
-	romoffs, ramoffs int
+	romoffs, ramoffs uint16
 
 	inbios bool
-	Ie     byte
-	If byte
+	Ie     uint8
+	If uint8
 
 	mbcs [2]mbc
 
-	eram [32768]byte
-	wram [8192]byte
-	zram [127]byte
+	eram [32768]uint8
+	wram [8192]uint8
+	zram [127]uint8
 }
 
 func makeMMU() mmu {
@@ -34,7 +34,7 @@ func makeMMU() mmu {
 }
 
 var (
-	bios = [0x100]byte{
+	bios = [0x100]uint8{
 		0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32, 0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
 		0x11, 0x3E, 0x80, 0x32, 0xE2, 0x0C, 0x3E, 0xF3, 0xE2, 0x32, 0x3E, 0x77, 0x77, 0x3E, 0xFC, 0xE0,
 		0x47, 0x11, 0x04, 0x01, 0x21, 0x10, 0x80, 0x1A, 0xCD, 0x95, 0x00, 0xCD, 0x96, 0x00, 0x13, 0x7B,
@@ -54,7 +54,7 @@ var (
 	}
 )
 
-func (m mmu) ReadByte(addr int) byte {
+func (m mmu) ReadByte(addr uint16) uint8 {
 	switch addr & 0xF000 {
 	// ROM bank 0
 	case 0x0000:
@@ -127,15 +127,15 @@ func (m mmu) ReadByte(addr int) byte {
 			}
 		}
 	}
-	log.Panic("Failed to read byte from ", addr)
+	log.Panicf("Failed to read byte from %x\n", addr)
 	return 0
 }
 
-func (m mmu) ReadWord(addr int) int {
-	return int(m.ReadByte(addr)) + int((m.ReadByte(addr+1) << 8))
+func (m mmu) ReadWord(addr uint16) uint16 {
+	return uint16(m.ReadByte(addr)) + (uint16(m.ReadByte(addr+1)) << 8)
 }
 
-func (m *mmu) WriteByte(addr int, value byte) {
+func (m *mmu) WriteByte(addr uint16, value uint8) {
 	switch addr & 0xF000 {
 	// ROM bank 0
 	// MBC1: turn external RAM on
@@ -156,7 +156,7 @@ func (m *mmu) WriteByte(addr int, value byte) {
 				value = 1
 			}
 			m.mbcs[1].rombank |= value
-			m.romoffs = int(m.mbcs[1].rombank) * 0x4000
+			m.romoffs = uint16(m.mbcs[1].rombank) * 0x4000
 		}
 
 	// ROM bank 1
@@ -166,10 +166,10 @@ func (m *mmu) WriteByte(addr int, value byte) {
 			if m.mbcs[1].mode == 0 {
 				m.mbcs[1].rombank &= 0x1F
 				m.mbcs[1].rombank |= ((value & 3) << 5)
-				m.romoffs = int(m.mbcs[1].rombank) * 0x4000
+				m.romoffs = uint16(m.mbcs[1].rombank) * 0x4000
 			} else {
 				m.mbcs[1].rambank = value & 3
-				m.ramoffs = int(m.mbcs[1].rambank) * 0x2000
+				m.ramoffs = uint16(m.mbcs[1].rambank) * 0x2000
 			}
 		}
 
@@ -230,12 +230,12 @@ func (m *mmu) WriteByte(addr int, value byte) {
 			}
 		}
 	}
-	log.Panic("Failed to write byte to ", addr)
+	log.Printf("Warning: failed to write byte %x to %x\n", value, addr)
 }
 
-func (m *mmu) WriteWord(addr, value int) {
-	m.WriteByte(addr, byte(value&0xFF))
-	m.WriteByte(addr+1, byte((value>>8)&0xFF))
+func (m *mmu) WriteWord(addr, value uint16) {
+	m.WriteByte(addr, uint8(value&0xFF))
+	m.WriteByte(addr+1, uint8((value>>8)&0xFF))
 }
 
 func (m *mmu) Load(file string) {
@@ -249,7 +249,7 @@ func (m *mmu) Load(file string) {
 		panic(err)
 	}
 
-	m.rom = make([]byte, fi.Size())
+	m.rom = make([]uint8, fi.Size())
 	n, err := f.Read(m.rom)
 	if err != nil {
 		panic(err)
