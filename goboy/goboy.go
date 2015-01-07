@@ -21,13 +21,12 @@ func frame() {
 	t0 := time.Now()
 	for Z80.M < fclock {
 		if Z80.Halt {
-			Z80.Call("NOP")
+			Z80.Call(0x00)  // NOP
 		} else {
 			Z80.R.r = (Z80.R.r + 1) & 0xFF
 			op := MMU.ReadByte(Z80.R.Pc)
-			log.Printf("op [%x] %q\n", op, Opcodes[op])
 			Z80.R.Pc = Z80.R.Pc + 1
-			Z80.Call(Opcodes[op])
+			Z80.Call(op)
 		}
 
 		// check for interrupts
@@ -38,19 +37,19 @@ func frame() {
 			ifired := MMU.Ie & MMU.If
 			if (ifired & 1) != 0 {
 				MMU.If &= 0xFE
-				Z80.Call("RST40")
+				Z80.reset(0x40)
 			} else if (ifired & 2) != 0 {
 				MMU.If &= 0xFD
-				Z80.Call("RST48")
+				Z80.reset(0x48)
 			} else if (ifired & 4) != 0 {
 				MMU.If &= 0xFB
-				Z80.Call("RST50")
+				Z80.reset(0x50)
 			} else if (ifired & 8) != 0 {
 				MMU.If &= 0xF7
-				Z80.Call("RST58")
+				Z80.reset(0x58)
 			} else if (ifired & 16) != 0 {
 				MMU.If &= 0xEF
-				Z80.Call("RST60")
+				Z80.reset(0x60)
 			} else {
 				Z80.R.Ime = true
 			}
