@@ -136,6 +136,7 @@ func (m mmu) ReadWord(addr uint16) uint16 {
 }
 
 func (m *mmu) WriteByte(addr uint16, value uint8) {
+	log.Printf("wb: %x %x\n", addr, value)
 	switch addr & 0xF000 {
 	// ROM bank 0
 	// MBC1: turn external RAM on
@@ -230,7 +231,7 @@ func (m *mmu) WriteByte(addr uint16, value uint8) {
 			}
 		}
 	}
-	log.Printf("Warning: failed to write byte %x to %x\n", value, addr)
+	//log.Printf("Warning: failed to write byte %x to %x\n", value, addr)
 }
 
 func (m *mmu) WriteWord(addr, value uint16) {

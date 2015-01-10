@@ -143,7 +143,7 @@ func (g *gpu) Checkline() {
 						if g.xscrl {
 							xscrl = 1
 						}
-						mapbase := g.bgmapbase + uint16((((g.curline + yscrl) & 0xFF) >> 3) << 5)
+						mapbase := g.bgmapbase + uint16(((g.curline + yscrl) >> 3) << 5)
 						y := (g.curline + yscrl) & 7
 						x := xscrl & 7
 						t := uint16(xscrl >> 3) & 31
@@ -156,7 +156,8 @@ func (g *gpu) Checkline() {
 						//	}
 							tilerow := g.tilemap[tile][y]
 							for w := SCREEN_WIDTH; w > 0; w -= 1 {
-								g.scanrow[SCREEN_WIDTH-x] = tilerow[x]
+								g.scanrow[SCREEN_WIDTH-x-1] = tilerow[x]
+								log.Printf("a: %x = %x\n", linebase+3, g.pal.bg[tilerow[x]])
 								g.Screen[linebase + 3] = g.pal.bg[tilerow[x]]
 								x += 1
 								if x == 8 {
@@ -174,8 +175,9 @@ func (g *gpu) Checkline() {
 						} else {
 							tilerow := g.tilemap[g.vram[mapbase+t]][y]
 							for w := SCREEN_WIDTH; w > 0; w -= 1 {
-								g.scanrow[SCREEN_WIDTH-x] = tilerow[x]
+								g.scanrow[SCREEN_WIDTH-x-1] = tilerow[x]
 								g.Screen[linebase + 3] = g.pal.bg[tilerow[x]]
+								log.Printf("b: %x = %x\n", linebase+3, g.pal.bg[tilerow[x]])
 								x += 1
 								if x == 8 {
 									t = (t + 1) & 31

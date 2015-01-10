@@ -89,7 +89,13 @@ var (
 			Z80.R.a = MMU.ReadByte((uint16(Z80.R.b) << 8) + uint16(Z80.R.c))
 			Z80.R.M = 2
 		}},
-		{"DECBC", nil},
+		{"DECBC", func() {
+			Z80.R.c -= 1
+			if Z80.R.c == 0xff {
+				Z80.R.b -= 1
+			}
+			Z80.R.M = 1
+		}},
 
 		{"INCr_c", nil},
 		{"DECr_c", nil},
@@ -270,7 +276,14 @@ var (
 			Z80.R.Pc += 1
 			Z80.R.M = 2
 		}},
-		{"CPL", nil},
+		{"CPL", func() {
+			Z80.R.a ^= 0xFF
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.M = 1
+		}},
 
 		// 0x30
 		{"JRNCn", nil},
@@ -685,9 +698,30 @@ var (
 		{"XORr_a", nil},
 
 		// 0xB0
-		{"ORr_b", nil},
-		{"ORr_c", nil},
-		{"ORr_d", nil},
+		{"ORr_b", func() {
+			Z80.R.a |= Z80.R.b
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.M = 1
+		}},
+		{"ORr_c", func() {
+			Z80.R.a |= Z80.R.c
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.M = 1
+		}},
+		{"ORr_d", func() {
+			Z80.R.a |= Z80.R.d
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.M = 1
+		}},
 		{"ORr_e", func() {
 			Z80.R.a |= Z80.R.e
 			Z80.R.f = 0x80
@@ -697,10 +731,31 @@ var (
 			Z80.R.M = 1
 		}},
 
-		{"ORr_h", nil},
-		{"ORr_l", nil},
+		{"ORr_h", func() {
+			Z80.R.a |= Z80.R.h
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.M = 1
+		}},
+		{"ORr_l", func() {
+			Z80.R.a |= Z80.R.l
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.M = 1
+		}},
 		{"ORHL", nil},
-		{"ORr_a", nil},
+		{"ORr_a", func() {
+			Z80.R.a |= Z80.R.a
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.M = 1
+		}},
 
 		{"CPr_b", nil},
 		{"CPr_c", nil},
@@ -759,7 +814,11 @@ var (
 			Z80.R.M = 3
 		}},
 		{"JPZnn", nil},
-		{"MAPcb", nil},
+		{"MAPcb", func() {
+			i := MMU.ReadByte(Z80.R.Pc)
+			Z80.R.Pc += 1
+			Z80.cb(i)
+		}},
 
 		{"CALLZnn", nil},
 		{"CALLnn", func() {
@@ -920,7 +979,11 @@ var (
 
 		{"LDHLSPn", nil},
 		{"XX", nil},
-		{"LDAmm", nil},
+		{"LDAmm", func() {
+			Z80.R.a = MMU.ReadByte(MMU.ReadWord(Z80.R.Pc))
+			Z80.R.Pc += 2
+			Z80.R.M = 4
+		}},
 		{"EI", func() {
 			Z80.R.Ime = true
 			Z80.R.M = 1
@@ -948,6 +1011,397 @@ var (
 		}},
 		{"RST38", func() { Z80.reset(0x38) }},
 	}
+
+	cbinstructions = [0x100]instruction {
+		// CB00 
+		{"RLCr_b", nil},
+		{"RLCr_c", nil},
+		{"RLCr_d", nil},
+		{"RLCr_e", nil},
+
+		{"RLCr_l", nil},
+		{"RLCHL", nil},
+		{"RLCr_a", nil},
+
+		{"RRCr_b", nil},
+		{"RRCr_c", nil},
+		{"RRCr_d", nil},
+		{"RRCr_e", nil},
+
+		{"RRCr_h", nil},
+		{"RRCr_l", nil},
+		{"RRCHL", nil},
+		{"RRCr_a", nil},
+
+		// CB10
+		{"RLr_b", nil},
+		{"RLr_c", nil},
+		{"RLr_d", nil},
+		{"RLr_e", nil},
+
+		{"RLr_h", nil},
+		{"RLr_l", nil},
+		{"RLHL", nil},
+		{"RLr_a", nil},
+
+		{"RRr_b", nil},
+		{"RRr_c", nil},
+		{"RRr_d", nil},
+		{"RRr_e", nil},
+
+		{"RRr_h", nil},
+		{"RRr_l", nil},
+		{"RRHL", nil},
+		{"RRr_a", nil},
+
+		// CB20
+		{"SLAr_b", nil},
+		{"SLAr_c", nil},
+		{"SLAr_d", nil},
+		{"SLAr_e", nil},
+
+		{"SLAr_h", nil},
+		{"SLAr_l", nil},
+		{"XX", nil},
+		{"SLAr_a", nil},
+
+		{"SRAr_b", nil},
+		{"SRAr_c", nil},
+		{"SRAr_d", nil},
+		{"SRAr_e", nil},
+
+		{"SRAr_h", nil},
+		{"SRAr_l", nil},
+		{"XX", nil},
+		{"SRAr_a", nil},
+
+		// CB30
+		{"SWAPr_b", nil},
+		{"SWAPr_c", nil},
+		{"SWAPr_d", nil},
+		{"SWAPr_e", nil},
+
+		{"SWAPr_h", nil},
+		{"SWAPr_l", nil},
+		{"XX", nil},
+		{"SWAPr_a", nil},
+
+		{"SRLr_b", func() {
+			co := uint8(0)
+			if Z80.R.b & 0x1 != 0 {
+				co = 0x10
+			}
+			Z80.R.b >>= 1
+			Z80.R.f = 0x80
+			if Z80.R.b != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.f = (Z80.R.f & 0xEF) + co
+			Z80.R.M = 2
+		}},
+		{"SRLr_c", func() {
+			co := uint8(0)
+			if Z80.R.c & 0x1 != 0 {
+				co = 0x10
+			}
+			Z80.R.c >>= 1
+			Z80.R.f = 0x80
+			if Z80.R.c != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.f = (Z80.R.f & 0xEF) + co
+			Z80.R.M = 2
+		}},
+		{"SRLr_d", func() {
+			co := uint8(0)
+			if Z80.R.d & 0x1 != 0 {
+				co = 0x10
+			}
+			Z80.R.d >>= 1
+			Z80.R.f = 0x80
+			if Z80.R.d != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.f = (Z80.R.f & 0xEF) + co
+			Z80.R.M = 2
+		}},
+		{"SRLr_e", func() {
+			co := uint8(0)
+			if Z80.R.e & 0x1 != 0 {
+				co = 0x10
+			}
+			Z80.R.e >>= 1
+			Z80.R.f = 0x80
+			if Z80.R.e != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.f = (Z80.R.f & 0xEF) + co
+			Z80.R.M = 2
+		}},
+
+		{"SRLr_h", func() {
+			co := uint8(0)
+			if Z80.R.h & 0x1 != 0 {
+				co = 0x10
+			}
+			Z80.R.h >>= 1
+			Z80.R.f = 0x80
+			if Z80.R.h != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.f = (Z80.R.f & 0xEF) + co
+			Z80.R.M = 2
+		}},
+		{"SRLr_l", func() {
+			co := uint8(0)
+			if Z80.R.l & 0x1 != 0 {
+				co = 0x10
+			}
+			Z80.R.l >>= 1
+			Z80.R.f = 0x80
+			if Z80.R.l != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.f = (Z80.R.f & 0xEF) + co
+			Z80.R.M = 2
+		}},
+		{"XX", nil},
+		{"SRLr_a", func() {
+			co := uint8(0)
+			if Z80.R.a & 0x1 != 0 {
+				co = 0x10
+			}
+			Z80.R.a >>= 1
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.f = (Z80.R.f & 0xEF) + co
+			Z80.R.M = 2
+		}},
+
+		// CB40
+		{"BIT0b", nil},
+		{"BIT0c", nil},
+		{"BIT0d", nil},
+		{"BIT0e", nil},
+
+		{"BIT0h", nil},
+		{"BIT0l", nil},
+		{"BIT0m", nil},
+		{"BIT0a", nil},
+
+		{"BIT1b", nil},
+		{"BIT1c", nil},
+		{"BIT1d", nil},
+		{"BIT1e", nil},
+
+		{"BIT1h", nil},
+		{"BIT1l", nil},
+		{"BIT1m", nil},
+		{"BIT1a", nil},
+
+		// CB50
+		{"BIT2b", nil},
+		{"BIT2c", nil},
+		{"BIT2d", nil},
+		{"BIT2e", nil},
+
+		{"BIT2h", nil},
+		{"BIT2l", nil},
+		{"BIT2m", nil},
+		{"BIT2a", nil},
+
+		{"BIT3b", nil},
+		{"BIT3c", nil},
+		{"BIT3d", nil},
+		{"BIT3e", nil},
+
+		{"BIT3h", nil},
+		{"BIT3l", nil},
+		{"BIT3m", nil},
+		{"BIT3a", nil},
+
+		// CB60
+		{"BIT4b", nil},
+		{"BIT4c", nil},
+		{"BIT4d", nil},
+		{"BIT4e,", nil},
+		{"BIT4h", nil},
+		{"BIT4l", nil},
+		{"BIT4m", nil},
+		{"BIT4a,", nil},
+		{"BIT5b", nil},
+		{"BIT5c", nil},
+		{"BIT5d", nil},
+		{"BIT5e,", nil},
+		{"BIT5h", nil},
+		{"BIT5l", nil},
+		{"BIT5m", nil},
+		{"BIT5a", nil},
+
+		// CB70
+		{"BIT6b", nil},
+		{"BIT6c", nil},
+		{"BIT6d", nil},
+		{"BIT6e", nil},
+		{"BIT6h", nil},
+		{"BIT6l", nil},
+		{"BIT6m", nil},
+		{"BIT6a", nil},
+		{"BIT7b", nil},
+		{"BIT7c", nil},
+		{"BIT7d", nil},
+		{"BIT7e", nil},
+		{"BIT7h", nil},
+		{"BIT7l", nil},
+		{"BIT7m", nil},
+		{"BIT7a", nil},
+
+		// CB80
+		{"RES0b", nil},
+		{"RES0c", nil},
+		{"RES0d", nil},
+		{"RES0e", nil},
+		{"RES0h", nil},
+		{"RES0l", nil},
+		{"RES0m", nil},
+		{"RES0a", nil},
+		{"RES1b", nil},
+		{"RES1c", nil},
+		{"RES1d", nil},
+		{"RES1e", nil},
+		{"RES1h", nil},
+		{"RES1l", nil},
+		{"RES1m", nil},
+		{"RES1a", nil},
+
+		// CB90
+		{"RES2b", nil},
+		{"RES2c", nil},
+		{"RES2d", nil},
+		{"RES2e", nil},
+		{"RES2h", nil},
+		{"RES2l", nil},
+		{"RES2m", nil},
+		{"RES2a", nil},
+		{"RES3b", nil},
+		{"RES3c", nil},
+		{"RES3d", nil},
+		{"RES3e", nil},
+		{"RES3h", nil},
+		{"RES3l", nil},
+		{"RES3m", nil},
+		{"RES3a", nil},
+
+		// CBA0
+		{"RES4b", nil},
+		{"RES4c", nil},
+		{"RES4d", nil},
+		{"RES4e", nil},
+		{"RES4h", nil},
+		{"RES4l", nil},
+		{"RES4m", nil},
+		{"RES4a", nil},
+		{"RES5b", nil},
+		{"RES5c", nil},
+		{"RES5d", nil},
+		{"RES5e", nil},
+		{"RES5h", nil},
+		{"RES5l", nil},
+		{"RES5m", nil},
+		{"RES5a", nil},
+
+		// CBB0
+		{"RES6b", nil},
+		{"RES6c", nil},
+		{"RES6d", nil},
+		{"RES6e", nil},
+		{"RES6h", nil},
+		{"RES6l", nil},
+		{"RES6m", nil},
+		{"RES6a", nil},
+		{"RES7b", nil},
+		{"RES7c", nil},
+		{"RES7d", nil},
+		{"RES7e", nil},
+		{"RES7h", nil},
+		{"RES7l", nil},
+		{"RES7m", nil},
+		{"RES7a", nil},
+
+		// CBC0
+		{"SET0b", nil},
+		{"SET0c", nil},
+		{"SET0d", nil},
+		{"SET0e", nil},
+		{"SET0h", nil},
+		{"SET0l", nil},
+		{"SET0m", nil},
+		{"SET0a", nil},
+		{"SET1b", nil},
+		{"SET1c", nil},
+		{"SET1d", nil},
+		{"SET1e", nil},
+		{"SET1h", nil},
+		{"SET1l", nil},
+		{"SET1m", nil},
+		{"SET1a", nil},
+
+		// CBD0
+		{"SET2b", nil},
+		{"SET2c", nil},
+		{"SET2d", nil},
+		{"SET2e", nil},
+		{"SET2h", nil},
+		{"SET2l", nil},
+		{"SET2m", nil},
+		{"SET2a", nil},
+		{"SET3b", nil},
+		{"SET3c", nil},
+		{"SET3d", nil},
+		{"SET3e", nil},
+		{"SET3h", nil},
+		{"SET3l", nil},
+		{"SET3m", nil},
+		{"SET3a", nil},
+
+		// CBE0
+		{"SET4b", nil},
+		{"SET4c", nil},
+		{"SET4d", nil},
+		{"SET4e", nil},
+		{"SET4h", nil},
+		{"SET4l", nil},
+		{"SET4m", nil},
+		{"SET4a", nil},
+		{"SET5b", nil},
+		{"SET5c", nil},
+		{"SET5d", nil},
+		{"SET5e", nil},
+		{"SET5h", nil},
+		{"SET5l", nil},
+		{"SET5m", nil},
+		{"SET5a", nil},
+
+		// CBF0
+		{"SET6b", nil},
+		{"SET6c", nil},
+		{"SET6d", nil},
+		{"SET6e", nil},
+		{"SET6h", nil},
+		{"SET6l", nil},
+		{"SET6m", nil},
+		{"SET6a", nil},
+		{"SET7b", nil},
+		{"SET7c", nil},
+		{"SET7d", nil},
+		{"SET7e", nil},
+		{"SET7h", nil},
+		{"SET7l", nil},
+		{"SET7m", nil},
+		{"SET7a", nil},
+	}
 )
 
 func (z z80) Call(op uint8) {
@@ -957,6 +1411,15 @@ func (z z80) Call(op uint8) {
 	}
 	log.Printf("z80: op [0x%x] %q\n", op, instr.name)
 	instr.f.(func())()
+}
+
+func (z z80) cb(op uint8) {
+	cbinstr := cbinstructions[op]
+	if cbinstr.f == nil {
+		log.Panicf("z80: nil cbinstruction for op [0x%x] %q\n", op, cbinstr.name)
+	}
+	log.Printf("z80: cbop [0x%x] %q\n", op, cbinstr.name)
+	cbinstr.f.(func())()
 }
 
 func (z *z80) storeRegisters() {

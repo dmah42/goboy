@@ -23,7 +23,7 @@ func frame() {
 		if Z80.Halt {
 			Z80.Call(0x00)  // NOP
 		} else {
-			Z80.R.r = (Z80.R.r + 1) & 0xFF
+			Z80.R.R += 1
 			op := MMU.ReadByte(Z80.R.Pc)
 			Z80.R.Pc = Z80.R.Pc + 1
 			Z80.Call(op)
@@ -55,16 +55,14 @@ func frame() {
 			}
 		}
 		log.Printf("z80: %#v\n", Z80)
+		// log.Printf("mmu: %#v %#v %#v\n", MMU.inbios, MMU.Ie, MMU.If)
+		// log.Printf("timer: %#v\n", Timer)
+		// log.Printf("key: %#v\n", Key)
+		// log.Println("-----------------")
 		Z80.M += Z80.R.M
 		GPU.Checkline()
 		Timer.Inc()
 
-		// log.Printf("z80: %+v\n", Z80)
-		// log.Printf("mmu: %+v %+v %+v\n", MMU.inbios, MMU.Ie, MMU.If)
-		// log.Printf("timer: %+v\n", Timer)
-		// log.Printf("key: %+v\n", Key)
-		// log.Printf("gpu: %+v %+v %+v\n", GPU.linemode, GPU.modeclocks, GPU.curline)
-		// log.Println("-----------------")
 	}
 	log.Printf("frame time: %.3f s\n", time.Since(t0).Seconds())
 }
