@@ -10,7 +10,7 @@ type saveRegisters struct {
 
 type registers struct {
 	a, b, c, d, e, h, l, f uint8
-	Pc, sp, i, r           uint16
+	Pc, sp, R	       uint16
 	M                      int
 	Ime                    bool
 }
@@ -85,7 +85,10 @@ var (
 			Z80.R.l = uint8(hl & 0xFF)
 			Z80.R.M = 3
 		}},
-		{"LDABCm", nil},
+		{"LDABCm", func() {
+			Z80.R.a = MMU.ReadByte((uint16(Z80.R.b) << 8) + uint16(Z80.R.c))
+			Z80.R.M = 2
+		}},
 		{"DECBC", nil},
 
 		{"INCr_c", nil},
@@ -117,8 +120,24 @@ var (
 			Z80.R.M = 1
 		}},
 
-		{"INCr_d", nil},
-		{"DECr_d", nil},
+		{"INCr_d", func() {
+			d := int(Z80.R.d) + 1
+			Z80.R.d = uint8(d & 0xFF)
+			Z80.R.f = 0
+			if Z80.R.d == 0 {
+				Z80.R.f = 0x80
+			}
+			Z80.R.M = 1
+		}},
+		{"DECr_d", func() {
+			d := int(Z80.R.d) - 1
+			Z80.R.d = uint8(d & 0xFF)
+			Z80.R.f = 0
+			if Z80.R.d == 0 {
+				Z80.R.f = 0x80
+			}
+			Z80.R.M = 1
+		}},
 		{"LDrn_d", func() {
 			Z80.R.d = MMU.ReadByte(Z80.R.Pc)
 			Z80.R.Pc += 1
@@ -126,7 +145,17 @@ var (
 		}},
 		{"RLA", nil},
 
-		{"JRn", nil},
+		{"JRn", func() {
+			i := int(MMU.ReadByte(Z80.R.Pc))
+			if i > 127 {
+				i = -((^i+1)&0xFF)
+			}
+			Z80.R.Pc += 1
+			Z80.R.M = 2
+			pc := int(Z80.R.Pc) + i
+			Z80.R.Pc = uint16(pc)
+			Z80.R.M += 1
+		}},
 		{"ADDHLDE", func() {
 			hl := uint(Z80.R.h << 8) + uint(Z80.R.l)
 			hl += uint(Z80.R.d << 8) + uint(Z80.R.e)
@@ -140,10 +169,32 @@ var (
 			Z80.R.M = 3
 		}},
 		{"LDADEm", nil},
-		{"DECDE", nil},
+		{"DECDE", func() {
+			Z80.R.e -= 1
+			if Z80.R.e == 0xff {
+				Z80.R.d -= 1
+			}
+			Z80.R.M = 1
+		}},
 
-		{"INCr_e", nil},
-		{"DECr_e", nil},
+		{"INCr_e", func() {
+			e := int(Z80.R.e) + 1
+			Z80.R.e = uint8(e & 0xFF)
+			Z80.R.f = 0
+			if Z80.R.e == 0 {
+				Z80.R.f = 0x80
+			}
+			Z80.R.M = 1
+		}},
+		{"DECr_e", func() {
+			e := int(Z80.R.e) - 1
+			Z80.R.e = uint8(e & 0xFF)
+			Z80.R.f = 0
+			if Z80.R.e == 0 {
+				Z80.R.f = 0x80
+			}
+			Z80.R.M = 1
+		}},
 		{"LDrn_e", func() {
 			Z80.R.e = MMU.ReadByte(Z80.R.Pc)
 			Z80.R.Pc += 1
@@ -152,14 +203,33 @@ var (
 		{"RRA", nil},
 
 		// 0x20
-		{"JRNZn", nil},
+		{"JRNZn", func() {
+			i := int(MMU.ReadByte(Z80.R.Pc))
+			if i > 127 {
+				i = -((^i+1)&0xFF)
+			}
+			Z80.R.Pc += 1
+			Z80.R.M = 2
+			if (Z80.R.f & 0x80) == 0x00 {
+				pc := int(Z80.R.Pc) + i
+				Z80.R.Pc = uint16(pc)
+				Z80.R.M += 1
+			}
+		}},
 		{"LDHLnn", func() {
 			Z80.R.l = MMU.ReadByte(Z80.R.Pc)
 			Z80.R.h = MMU.ReadByte(Z80.R.Pc + 1)
 			Z80.R.Pc += 2
 			Z80.R.M = 3
 		}},
-		{"LDHLIA", nil},
+		{"LDHLIA", func() {
+			MMU.WriteByte((uint16(Z80.R.h) << 8) + uint16(Z80.R.l), Z80.R.a)
+			Z80.R.l = Z80.R.l + 1  // TODO: test this overflows
+			if Z80.R.l == 0 {
+				Z80.R.h = Z80.R.h + 1  // TODO: test this overflows
+			}
+			Z80.R.M = 2
+		}},
 		{"INCHL", func() {
 			Z80.R.l = (Z80.R.l + 1) & 0xFF
 			if Z80.R.l == 0 {
@@ -453,18 +523,39 @@ var (
 		}},
 
 		// 0x70
-		{"LDHLmr_b", nil},
-		{"LDHLmr_c", nil},
-		{"LDHLmr_d", nil},
-		{"LDHLmr_e", nil},
+		{"LDHLmr_b", func() {
+			MMU.WriteByte((uint16(Z80.R.h) << 8) + uint16(Z80.R.l), Z80.R.b)
+			Z80.R.M = 2
+		}},
+		{"LDHLmr_c", func() {
+			MMU.WriteByte((uint16(Z80.R.h) << 8) + uint16(Z80.R.l), Z80.R.c)
+			Z80.R.M = 2
+		}},
+		{"LDHLmr_d", func() {
+			MMU.WriteByte((uint16(Z80.R.h) << 8) + uint16(Z80.R.l), Z80.R.d)
+			Z80.R.M = 2
+		}},
+		{"LDHLmr_e", func() {
+			MMU.WriteByte((uint16(Z80.R.h) << 8) + uint16(Z80.R.l), Z80.R.e)
+			Z80.R.M = 2
+		}},
 
-		{"LDHLmr_h", nil},
-		{"LDHLmr_l", nil},
+		{"LDHLmr_h", func() {
+			MMU.WriteByte((uint16(Z80.R.h) << 8) + uint16(Z80.R.l), Z80.R.h)
+			Z80.R.M = 2
+		}},
+		{"LDHLmr_l", func() {
+			MMU.WriteByte((uint16(Z80.R.h) << 8) + uint16(Z80.R.l), Z80.R.l)
+			Z80.R.M = 2
+		}},
 		{"HALT", func() {
 			Z80.Halt = true
 			Z80.R.M = 1
 		}},
-		{"LDHLmr_a", nil},
+		{"LDHLmr_a", func() {
+			MMU.WriteByte((uint16(Z80.R.h) << 8) + uint16(Z80.R.l), Z80.R.a)
+			Z80.R.M = 2
+		}},
 
 		{"LDrr_ab", func() {
 			Z80.R.a = Z80.R.b
@@ -597,7 +688,14 @@ var (
 		{"ORr_b", nil},
 		{"ORr_c", nil},
 		{"ORr_d", nil},
-		{"ORr_e", nil},
+		{"ORr_e", func() {
+			Z80.R.a |= Z80.R.e
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.M = 1
+		}},
 
 		{"ORr_h", nil},
 		{"ORr_l", nil},
@@ -753,7 +851,15 @@ var (
 			MMU.WriteByte(Z80.R.sp, Z80.R.l)
 			Z80.R.M = 3
 		}},
-		{"ANDn", nil},
+		{"ANDn", func() {
+			Z80.R.a &= MMU.ReadByte(Z80.R.Pc)
+			Z80.R.Pc += 1
+			Z80.R.f = 0x80
+			if Z80.R.a != 0 {
+				Z80.R.f = 0
+			}
+			Z80.R.M = 2
+		}},
 		{"RST20", func() { Z80.reset(0x20) }},
 
 		{"ADDSPn", func() {
