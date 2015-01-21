@@ -3,23 +3,51 @@
   <head>
     <title>goboy</title>
     <style type="text/css">
-      body { background-color: black; color: white; }
-      div#tilemap { width:64px; height: 64px; border: 1px solid white; margin: 1em; }
-      div#tilemap div { width: 8px; height: 8px; float: left; }
+      body {
+        background-color: black;
+        font-family: sans-serif;
+        color: white;
+      }
+      div#debugging {
+        float: left;
+        border: 1px dashed white;
+      }
+      div#controls {
+        margin-left: 1em;
+        margin-right: 1em;
+        margin-bottom: 1em;
+      }
+      div#tilemap {
+        width:64px;
+        height: 64px;
+        border: 1px solid white;
+        margin-left: 1em;
+        margin-right: 1em;
+        margin-top: 1em;
+      }
+      div#tilemap div {
+        width: 8px;
+        height: 8px;
+        float: left;
+        margin: 0;
+      }
     </style>
   </head>
   <body>
     <h1>goboy</h1>
-    <canvas id="screen" width="160" height="144">
-    </canvas>
-    <span id="run">Run</span>
+    <div id="screendiv">
+      <canvas id="screen" width="160" height="144"></canvas>
+      <span id="run">Run</span>
+    </div>
 
-    <br/>
-    <div id="tilemap"></div>
-    <br/>
-    <span id="prevtile">&lt;</span>
-    <span id="tilenum"></span>
-    <span id="nexttile">&gt;</span>
+    <div id="debugging">
+      <div id="tilemap"></div>
+      <div id="controls">
+        <span id="prevtile">&lt;</span>
+        <span id="tilenum"></span>
+        <span id="nexttile">&gt;</span>
+      </div>
+    </div>
 
     <!-- TODO: reset -->
     <!-- TODO: load input -->
