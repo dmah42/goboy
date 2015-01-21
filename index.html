@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>goboy</title>
+    <style type="text/css">
+      body { background-color: black; color: white; }
+      div#tilemap { width:64px; height: 64px; border: 1px solid white; margin: 1em; }
+      div#tilemap div { width: 8px; height: 8px; float: left; }
+    </style>
+  </head>
+  <body>
+    <h1>goboy</h1>
+    <canvas id="screen" width="160" height="144">
+    </canvas>
+    <span id="run">Run</span>
+
+    <br/>
+    <div id="tilemap"></div>
+    <br/>
+    <span id="prevtile">&lt;</span>
+    <span id="tilenum"></span>
+    <span id="nexttile">&gt;</span>
+
+    <!-- TODO: reset -->
+    <!-- TODO: load input -->
+    <script type="text/javascript">
+      var run = function() {
+        var req = new XMLHttpRequest();
+        req.open('GET', '/run', false);
+        req.send();
+
+        document.getElementById('run').innerHTML = 'Pause';
+        document.getElementById('run').onclick = pause;
+      }
+
+      var pause = function() {
+        var req = new XMLHttpRequest();
+        req.open('GET', '/pause', false);
+        req.send();
+
+        document.getElementById('run').innerHTML = 'Run';
+        document.getElementById('run').onclick = run;
+      }
+
+      var frame = function() {
+        var req = new XMLHttpRequest();
+        req.onload = render
+        req.open('GET', '/frame', false);
+        req.send();
+
+        window.requestAnimationFrame(frame);
+      }
+
+      var renderTilemap = function() {
+        var t = tilemap[tilenum];
+        var c = ['#ffffff', '#c0c0c0', '#606060', '#000000'];
+        var d = document.getElementById('tilemap').getElementsByTagName('div');
+        for (var y = 0; y < 8; ++y)
+          for (var x = 0; x < 8; ++x)
+            d[y*8+x].style.backgroundColor = c[t[y][x]];
+      }
+
+      var render = function() {
+        var data = JSON.parse(this.responseText);
+
+        // main canvas
+        var screen = document.getElementById('screen');
+        var ctx = screen.getContext('2d');
+        var b = ctx.getImageData(0, 0, screen.width, screen.height);
+
+        // TODO: scale up canvas
+        for (var i = 0; i < data.screen.length; ++i) {
+          b.data[i] = data.screen[i];
+        }
+
+        ctx.putImageData(b, 0, 0);
+
+        tilemap = data.tilemap;
+        renderTilemap();
+      }
+
+      var nexttile = function() {
+        tilenum = (tilenum + 1) % 384;
+        renderTilemap();
+        document.getElementById('tilenum').innerHTML = tilenum;
+      }
+
+      var prevtile = function() {
+        tilenum = (tilenum - 1) % 384;
+        renderTilemap();
+        document.getElementById('tilenum').innerHTML = tilenum;
+      }
+
+      var tilemap;
+      var tilenum = 0;
+      document.getElementById('prevtile').onclick = prevtile;
+      document.getElementById('nexttile').onclick = nexttile;
+      document.getElementById('tilenum').innerHTML = tilenum;
+
+      // build tilemaps
+      document.getElementById('tilemap').innerHTML='';
+      var tm = document.createElement('div');
+      var x;
+      for (var i = 0; i < 64; ++i) {
+        document.getElementById('tilemap').appendChild(tm);
+        tm = tm.cloneNode(false);
+      }
+
+      pause();
+
+      window.onkeydown = function(e) {
+        var req = new XMLHttpRequest();
+        req.open('GET', '/keydown?keycode=' + e.keyCode, true);
+        req.send();
+      }
+
+      window.onkeyup = function(e) {
+        var req = new XMLHttpRequest();
+        req.open('GET', '/keyup?keycode=' + e.keyCode, true);
+        req.send();
+      }
+
+      window.requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>
+

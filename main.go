@@ -16,91 +16,12 @@ import (
 const (
 	// rate = time.Millisecond * 16
 	rate = time.Second * 5
-
-	rootHTML = `<!DOCTYPE html>
-	<html>
-		<head>
-			<title>goboy</title>
-			<style type="text/css">
-				body { background-color: black; color: white; }
-			</style>
-		</head>
-		<body>
-			<h1>goboy</h1>
-			<canvas id="screen" width="160" height="144">
-			</canvas>
-			<span id="run">Run</span>
-			<!-- TODO: reset -->
-			<!-- TODO: load input -->
-			<script type="text/javascript">
-				var run = function() {
-					var req = new XMLHttpRequest();
-					req.open('GET', '/run', false);
-					req.send();
-
-					document.getElementById('run').innerHTML = 'Pause';
-					document.getElementById('run').onclick = pause;
-				}
-
-				var pause = function() {
-					var req = new XMLHttpRequest();
-					req.open('GET', '/pause', false);
-					req.send();
-
-					document.getElementById('run').innerHTML = 'Run';
-					document.getElementById('run').onclick = run;
-				}
-
-				var frame = function() {
-					var req = new XMLHttpRequest();
-					req.onload = render
-					req.open('GET', '/frame', false);
-					req.send();
-
-					window.requestAnimationFrame(frame);
-				}
-
-				var render = function() {
-					var screen = document.getElementById('screen');
-					var ctx = screen.getContext('2d');
-					var b = ctx.getImageData(0, 0, screen.width, screen.height);
-
-					var screenData = JSON.parse(this.responseText);
-
-					// TODO: scale up canvas
-					for (var i = 0; i < screenData.length; ++i) {
-						b.data[i] = screenData[i];
-					}
-
-					ctx.putImageData(b, 0, 0);
-				}
-
-				pause();
-
-				window.onkeydown = function(e) {
-					var req = new XMLHttpRequest();
-					req.open('GET', '/keydown?keycode=' + e.keyCode, true);
-					req.send();
-				}
-
-				window.onkeyup = function(e) {
-					var req = new XMLHttpRequest();
-					req.open('GET', '/keyup?keycode=' + e.keyCode, true);
-					req.send();
-				}
-
-				window.requestAnimationFrame(frame);
-			</script>
-		</body>
-	</html>`
 )
 
 var (
 	port = flag.Int("port", 8888, "Port on which to listen")
 	rom = flag.String("rom", "roms/ttt.gb", "The ROM to load and run")
 	run = flag.Bool("run", false, "Run the emulator automatically")
-
-	rootTemplate = template.Must(template.New("root").Parse(rootHTML))
 )
 
 func main() {
@@ -128,6 +49,13 @@ func main() {
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
+
+	rootTemplate, err := template.ParseFiles("index.html")
+	if err != nil {
+		log.Println("goboy: template parsing error: ", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	rootTemplate.Execute(w, nil)
 }
 
@@ -144,8 +72,13 @@ func pauseHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func frameHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: get registers as well as screen data
-	b, err := json.Marshal(goboy.GPU.Screen)
+	// TODO: get registers as well as gpu data
+	data := map[string]interface{} {
+		"screen": goboy.GPU.Screen,
+		"tilemap": goboy.GPU.Tilemap,
+	}
+
+	jsonData, err := json.Marshal(data)
 	if err != nil {
 		log.Println("goboy: screen marshal error: ", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -153,7 +86,7 @@ func frameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(b)
+	w.Write(jsonData)
 }
 
 func keydownHandler(w http.ResponseWriter, r *http.Request) {

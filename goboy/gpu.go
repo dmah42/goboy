@@ -42,7 +42,7 @@ type gpu struct {
 	reg [0xBF]uint8
 	od, odsorted [40]objdata
 	scanrow [SCREEN_WIDTH]uint8
-	tilemap [512][8][8]uint8
+	Tilemap [512][8][8]uint8
 	pal palette
 
 	Screen [SCREEN_WIDTH*SCREEN_HEIGHT*4]uint8
@@ -154,7 +154,7 @@ func (g *gpu) Checkline() {
 							//if tile < 128 {
 						//		tile = 256 + tile
 						//	}
-							tilerow := g.tilemap[tile][y]
+							tilerow := g.Tilemap[tile][y]
 							for w := SCREEN_WIDTH; w > 0; w -= 1 {
 								g.scanrow[SCREEN_WIDTH-x-1] = tilerow[x]
 								log.Printf("a: %x = %x\n", linebase+3, g.pal.bg[tilerow[x]])
@@ -168,12 +168,12 @@ func (g *gpu) Checkline() {
 									// if tile < 128 {
 									// 	tile = 256 + tile
 									// }
-									tilerow = g.tilemap[tile][y]
+									tilerow = g.Tilemap[tile][y]
 								}
 								linebase += 4
 							}
 						} else {
-							tilerow := g.tilemap[g.vram[mapbase+t]][y]
+							tilerow := g.Tilemap[g.vram[mapbase+t]][y]
 							for w := SCREEN_WIDTH; w > 0; w -= 1 {
 								g.scanrow[SCREEN_WIDTH-x-1] = tilerow[x]
 								g.Screen[linebase + 3] = g.pal.bg[tilerow[x]]
@@ -182,7 +182,7 @@ func (g *gpu) Checkline() {
 								if x == 8 {
 									t = (t + 1) & 31
 									x = 0
-									tilerow = g.tilemap[g.vram[mapbase+t]][y]
+									tilerow = g.Tilemap[g.vram[mapbase+t]][y]
 								}
 								linebase += 4
 							}
@@ -199,9 +199,9 @@ func (g *gpu) Checkline() {
 								obj := g.odsorted[i]
 								var curline int16 = int16(g.curline)
 								if obj.y <= curline && obj.y + 8 > curline {
-									tilerow := g.tilemap[obj.tile][curline - obj.y]
+									tilerow := g.Tilemap[obj.tile][curline - obj.y]
 									if obj.yflip {
-										tilerow = g.tilemap[obj.tile][7 - (curline - obj.y)]
+										tilerow = g.Tilemap[obj.tile][7 - (curline - obj.y)]
 									}
 
 									pal := g.pal.obj0
@@ -253,7 +253,7 @@ func (g *gpu) UpdateTile(addr uint16, value uint8) {
 	tile := (addr >> 4) & 511
 	y := (addr >> 1) & 7
 	for x := 0; x < 8; x += 1 {
-		sx := byte(1 << uint(x))
+		sx := byte(1 << (7 - uint(x)))
 
 		t := 0
 		if g.vram[saddr] & sx != 0 {
@@ -262,7 +262,7 @@ func (g *gpu) UpdateTile(addr uint16, value uint8) {
 		if g.vram[saddr+1] & sx != 0 {
 			t |= 2
 		}
-		g.tilemap[tile][y][x] = byte(t)
+		g.Tilemap[tile][y][x] = byte(t)
 	}
 }
 
